@@ -4,7 +4,6 @@ import { Pinecone } from "@pinecone-database/pinecone";
 import { YoutubeTranscript } from "youtube-transcript";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import OpenAI from "openai";
-import { HfInference } from "@huggingface/inference";
 
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY as string,
@@ -35,23 +34,12 @@ async function splitText(text: string) {
   return await splitter.splitText(text);
 }
 
-const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
-
-async function getEmbedding(text: string): Promise<number[]> {
-  const response = await hf.featureExtraction({
-    model: "sentence-transformers/nli-bert-large",
-    inputs: text,
+async function getEmbedding(text: string) {
+  const response = await openai.embeddings.create({
+    model: "openai/text-embedding-ada-002",
+    input: text,
   });
-
-  // Ensure the response is a number array
-  if (
-    Array.isArray(response) &&
-    response.every((item) => typeof item === "number")
-  ) {
-    return response;
-  } else {
-    throw new Error("Unexpected embedding format");
-  }
+  return response.data[0].embedding;
 }
 
 async function embedAndStore(texts: string[], videoId: string) {

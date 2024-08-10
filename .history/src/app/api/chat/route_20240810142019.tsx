@@ -37,27 +37,17 @@ async function splitText(text: string) {
 
 const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
-async function getEmbedding(text: string): Promise<number[]> {
+async function getEmbedding(text: string) {
   const response = await hf.featureExtraction({
-    model: "sentence-transformers/nli-bert-large",
+    model: "sentence-transformers/all-MiniLM-L6-v2",
     inputs: text,
   });
-
-  // Ensure the response is a number array
-  if (
-    Array.isArray(response) &&
-    response.every((item) => typeof item === "number")
-  ) {
-    return response;
-  } else {
-    throw new Error("Unexpected embedding format");
-  }
+  return response;
 }
 
 async function embedAndStore(texts: string[], videoId: string) {
   for (const text of texts) {
     const embedding = await getEmbedding(text);
-
     await index.upsert([
       {
         id: `${videoId}-${Date.now()}`,
@@ -70,7 +60,6 @@ async function embedAndStore(texts: string[], videoId: string) {
 
 async function queryPinecone(query: string) {
   const q_embedding = await getEmbedding(query);
-
   const queryResponse = await index.query({
     vector: q_embedding,
     topK: 3,

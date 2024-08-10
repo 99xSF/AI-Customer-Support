@@ -3,16 +3,9 @@ import axios from "axios";
 import { Pinecone } from "@pinecone-database/pinecone";
 import { YoutubeTranscript } from "youtube-transcript";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import OpenAI from "openai";
-import { HfInference } from "@huggingface/inference";
 
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY as string,
-});
-
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 const index = pinecone.Index("chat");
@@ -35,23 +28,21 @@ async function splitText(text: string) {
   return await splitter.splitText(text);
 }
 
-const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
-
-async function getEmbedding(text: string): Promise<number[]> {
-  const response = await hf.featureExtraction({
-    model: "sentence-transformers/nli-bert-large",
-    inputs: text,
-  });
-
-  // Ensure the response is a number array
-  if (
-    Array.isArray(response) &&
-    response.every((item) => typeof item === "number")
-  ) {
-    return response;
-  } else {
-    throw new Error("Unexpected embedding format");
-  }
+async function getEmbedding(text: string) {
+  const response = await axios.post(
+    "https://api.openrouter.ai/api/v1/embeddings",
+    {
+      model: "openai/text-embedding-ada-002",
+      input: text,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return response.data.data[0].embedding;
 }
 
 async function embedAndStore(texts: string[], videoId: string) {
@@ -106,17 +97,26 @@ export async function POST(req: NextRequest) {
       "\n"
     )}\n---------\nquestion:\n${userQuery}`;
 
-    const completion = await openai.chat.completions.create({
-      model: "mistralai/mistral-nemo",
-      messages: [
-        { role: "system", content: primer },
-        { role: "user", content: augmented_query },
-      ],
-      temperature: 0.7,
-      max_tokens: 150,
-    });
+    const response = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "mistralai/mistral-nemo",
+        messages: [
+          { role: "system", content: primer },
+          { role: "user", content: augmented_query },
+        ],
+        temperature: 0.7,
+        max_tokens: 150,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-    return NextResponse.json(completion.choices[0].message);
+    return NextResponse.json(response.data);
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(

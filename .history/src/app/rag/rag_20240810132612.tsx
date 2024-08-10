@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import axios from "axios";
+import { OpenAI } from "openai";
 import { Pinecone } from "@pinecone-database/pinecone";
+import axios from "axios";
 import { YoutubeTranscript } from "youtube-transcript";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import OpenAI from "openai";
-import { HfInference } from "@huggingface/inference";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
 
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY as string,
-});
-
-const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 const index = pinecone.Index("chat");
@@ -35,33 +33,17 @@ async function splitText(text: string) {
   return await splitter.splitText(text);
 }
 
-const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
-
-async function getEmbedding(text: string): Promise<number[]> {
-  const response = await hf.featureExtraction({
-    model: "sentence-transformers/nli-bert-large",
-    inputs: text,
-  });
-
-  // Ensure the response is a number array
-  if (
-    Array.isArray(response) &&
-    response.every((item) => typeof item === "number")
-  ) {
-    return response;
-  } else {
-    throw new Error("Unexpected embedding format");
-  }
-}
-
 async function embedAndStore(texts: string[], videoId: string) {
   for (const text of texts) {
-    const embedding = await getEmbedding(text);
+    const embedding = await openai.embeddings.create({
+      model: "text-embedding-ada-002",
+      input: text,
+    });
 
     await index.upsert([
       {
         id: `${videoId}-${Date.now()}`,
-        values: embedding,
+        values: embedding.data[0].embedding,
         metadata: { text, source: `youtube-${videoId}` },
       },
     ]);
@@ -69,10 +51,13 @@ async function embedAndStore(texts: string[], videoId: string) {
 }
 
 async function queryPinecone(query: string) {
-  const q_embedding = await getEmbedding(query);
+  const q_embedding = await openai.embeddings.create({
+    model: "text-embedding-ada-002",
+    input: query,
+  });
 
   const queryResponse = await index.query({
-    vector: q_embedding,
+    vector: q_embedding.data[0].embedding,
     topK: 3,
     includeMetadata: true,
   });
@@ -84,9 +69,8 @@ async function queryPinecone(query: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json();
+    const { messages, youtubeUrl } = await req.json();
     const userQuery = messages[messages.length - 1].content;
-    const youtubeUrl = "https://www.youtube.com/watch?v=w8M76fuyn8o&t=359s";
 
     // Process YouTube URL if provided
     if (youtubeUrl) {
@@ -106,17 +90,26 @@ export async function POST(req: NextRequest) {
       "\n"
     )}\n---------\nquestion:\n${userQuery}`;
 
-    const completion = await openai.chat.completions.create({
-      model: "mistralai/mistral-nemo",
-      messages: [
-        { role: "system", content: primer },
-        { role: "user", content: augmented_query },
-      ],
-      temperature: 0.7,
-      max_tokens: 150,
-    });
+    const response = await axios.post(
+      "https://api.openrouter.ai/v1/complete",
+      {
+        model: "mistralai/mistral-nemo",
+        messages: [
+          { role: "system", content: primer },
+          { role: "user", content: augmented_query },
+        ],
+        temperature: 0.7,
+        max_tokens: 150,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-    return NextResponse.json(completion.choices[0].message);
+    return NextResponse.json(response.data);
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(
