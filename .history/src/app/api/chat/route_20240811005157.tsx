@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
     const userQuery = messages[messages.length - 1].content;
-    const youtubeUrl = "https://www.youtube.com/watch?v=Q5TM_aBk7IM";
+    const youtubeUrl = "https://www.youtube.com/watch?v=w8M76fuyn8o&t=359s";
 
     // Process YouTube URL if provided
     if (youtubeUrl) {
