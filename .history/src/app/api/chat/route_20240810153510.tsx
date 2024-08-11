@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 150,
     });
 
-    return NextResponse.json(completion.choices[0].message.content);
+    return NextResponse.json(completion.choices[0].message);
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(

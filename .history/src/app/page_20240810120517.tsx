@@ -1,12 +1,5 @@
 "use client";
-import {
-  Box,
-  Button,
-  Stack,
-  TextField,
-  Typography,
-  CircularProgress,
-} from "@mui/material";
+import { Box, Button, Stack, TextField, Typography, CircularProgress } from "@mui/material";
 import { useState } from "react";
 
 interface Message {
@@ -39,7 +32,7 @@ export default function Home() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ messages: [...messages, userMessage] }),
+      body: JSON.stringify([...messages, userMessage]),
     });
 
     if (!response.body) {
@@ -84,10 +77,7 @@ export default function Home() {
   };
 
   return (
-    <main
-      className="flex min-h-screen flex-col items-center p-4"
-      style={{ backgroundColor: "#000" }}
-    >
+    <main className="flex min-h-screen flex-col items-center p-4" style={{ backgroundColor: "#000" }}>
       <Typography
         variant="h4"
         align="center"
@@ -118,9 +108,7 @@ export default function Home() {
             <Box
               key={index}
               display="flex"
-              justifyContent={
-                msg.role === "assistant" ? "flex-end" : "flex-start"
-              }
+              justifyContent={msg.role === "assistant" ? "flex-end" : "flex-start"}
               mb={1}
             >
               <Box

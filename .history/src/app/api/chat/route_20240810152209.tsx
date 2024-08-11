@@ -39,7 +39,7 @@ const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
 async function getEmbedding(text: string): Promise<number[]> {
   const response = await hf.featureExtraction({
-    model: "sentence-transformers/nli-bert-large",
+    model: "sentence-transformers/all-MiniLM-L6-v2",
     inputs: text,
   });
 
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 150,
     });
 
-    return NextResponse.json(completion.choices[0].message.content);
+    return NextResponse.json(completion.choices[0].message);
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(

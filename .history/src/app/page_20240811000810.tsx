@@ -131,7 +131,7 @@ export default function Home() {
                 maxWidth="80%"
                 sx={{ position: "relative" }}
               >
-                {msg.content}
+                {msg.content.content}
                 {msg.role === "assistant" && isTyping && (
                   <Box
                     sx={{

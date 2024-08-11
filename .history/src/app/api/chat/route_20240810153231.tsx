@@ -43,15 +43,18 @@ async function getEmbedding(text: string): Promise<number[]> {
     inputs: text,
   });
 
-  // Ensure the response is a number array
-  if (
-    Array.isArray(response) &&
-    response.every((item) => typeof item === "number")
-  ) {
-    return response;
-  } else {
-    throw new Error("Unexpected embedding format");
+  // Handle different possible types of FeatureExtractionOutput
+  if (Array.isArray(response)) {
+    if (response.every((item) => typeof item === "number")) {
+      return response as number[];
+    } else if (Array.isArray(response[0])) {
+      return response[0] as number[];
+    }
+  } else if (typeof response === "number") {
+    return [response];
   }
+
+  throw new Error("Unexpected embedding format");
 }
 
 async function embedAndStore(texts: string[], videoId: string) {
@@ -116,7 +119,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 150,
     });
 
-    return NextResponse.json(completion.choices[0].message.content);
+    return NextResponse.json(completion.choices[0].message);
   } catch (error) {
     console.error("Error:", error);
     return NextResponse.json(
