@@ -19,9 +19,19 @@ const openai = new OpenAI({
 const index = pinecone.Index("chat");
 
 async function getYoutubeTranscript(videoId: string) {
+  const options = {
+    method: "GET",
+    url: "https://youtube-transcript1.p.rapidapi.com/transcript",
+    params: { video_id: videoId },
+    headers: {
+      "X-RapidAPI-Key": process.env.RAPIDAPI_KEY,
+      "X-RapidAPI-Host": "youtube-transcript1.p.rapidapi.com",
+    },
+  };
+
   try {
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    return transcript.map((item) => item.text).join(" ");
+    const response = await axios.request(options);
+    return response.data.map((item: { text: string }) => item.text).join(" ");
   } catch (error) {
     console.error("Error fetching YouTube transcript:", error);
     throw error;
@@ -44,15 +54,12 @@ async function getEmbedding(text: string): Promise<number[]> {
     inputs: text,
   });
 
+  // Ensure the response is a number array
   if (
     Array.isArray(response) &&
     response.every((item) => typeof item === "number")
   ) {
-    return response as number[];
-  } else if (Array.isArray(response) && Array.isArray(response[0])) {
-    return response[0] as number[];
-  } else if (typeof response === "number") {
-    return [response];
+    return response;
   } else {
     throw new Error("Unexpected embedding format");
   }
@@ -90,8 +97,7 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
     const userQuery = messages[messages.length - 1].content;
-    const youtubeUrl =
-      "https://www.youtube.com/watch?v=9boMnm5X9ak&list=PLC3y8-rFHvwheJHvseC3I0HuYI2f46oAK";
+    const youtubeUrl = "https://www.youtube.com/watch?v=Q5TM_aBk7IM";
 
     // Process YouTube URL if provided
     if (youtubeUrl) {

@@ -18,10 +18,41 @@ const openai = new OpenAI({
 
 const index = pinecone.Index("chat");
 
-async function getYoutubeTranscript(videoId: string) {
+interface InvidiousTranscriptItem {
+  text: string;
+  start: number;
+  dur: number;
+}
+
+interface InvidiousCaption {
+  language_code: string;
+  url: string;
+}
+
+async function getYoutubeTranscript(videoId: string): Promise<string> {
   try {
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    return transcript.map((item) => item.text).join(" ");
+    const response = await axios.get(
+      `https://invidious.snopyta.org/api/v1/videos/${videoId}/captions`
+    );
+    const captions = response.data;
+
+    if (captions && typeof captions === "object") {
+      const captionEntries = Object.entries(captions);
+      const englishCaption = captionEntries.find(
+        ([key, value]: [string, any]) =>
+          value.language_code === "en" || key.startsWith("en")
+      );
+
+      if (englishCaption) {
+        const transcriptResponse = await axios.get(englishCaption[1].url);
+        const transcript: InvidiousTranscriptItem[] = transcriptResponse.data;
+        return transcript.map((item) => item.text).join(" ");
+      } else {
+        throw new Error("English captions not found");
+      }
+    } else {
+      throw new Error("Invalid response format from Invidious API");
+    }
   } catch (error) {
     console.error("Error fetching YouTube transcript:", error);
     throw error;
@@ -44,15 +75,12 @@ async function getEmbedding(text: string): Promise<number[]> {
     inputs: text,
   });
 
+  // Ensure the response is a number array
   if (
     Array.isArray(response) &&
     response.every((item) => typeof item === "number")
   ) {
-    return response as number[];
-  } else if (Array.isArray(response) && Array.isArray(response[0])) {
-    return response[0] as number[];
-  } else if (typeof response === "number") {
-    return [response];
+    return response;
   } else {
     throw new Error("Unexpected embedding format");
   }
@@ -90,8 +118,7 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
     const userQuery = messages[messages.length - 1].content;
-    const youtubeUrl =
-      "https://www.youtube.com/watch?v=9boMnm5X9ak&list=PLC3y8-rFHvwheJHvseC3I0HuYI2f46oAK";
+    const youtubeUrl = "https://www.youtube.com/watch?v=zaBy46MEUdY";
 
     // Process YouTube URL if provided
     if (youtubeUrl) {

@@ -19,12 +19,51 @@ const openai = new OpenAI({
 const index = pinecone.Index("chat");
 
 async function getYoutubeTranscript(videoId: string) {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"], // These args might be necessary in some environments
+  });
+  const page = await browser.newPage();
+
   try {
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    return transcript.map((item) => item.text).join(" ");
+    await page.goto(`https://www.youtube.com/watch?v=${videoId}`, {
+      waitUntil: "networkidle0",
+    });
+
+    // Wait for and click the "..." button
+    await page.waitForSelector(
+      "ytd-menu-renderer.ytd-video-primary-info-renderer > yt-icon-button.dropdown-trigger > button"
+    );
+    await page.click(
+      "ytd-menu-renderer.ytd-video-primary-info-renderer > yt-icon-button.dropdown-trigger > button"
+    );
+
+    // Wait for and click the "Show transcript" option
+    await page.waitForSelector("ytd-menu-service-item-renderer:nth-child(2)");
+    await page.click("ytd-menu-service-item-renderer:nth-child(2)");
+
+    // Wait for the transcript to load
+    await page.waitForSelector("ytd-transcript-segment-renderer");
+
+    // Extract the transcript text
+    const transcript = await page.evaluate(() => {
+      const segments = document.querySelectorAll(
+        "ytd-transcript-segment-renderer"
+      );
+      return Array.from(segments)
+        .map((segment) => {
+          const textElement = segment.querySelector("#content");
+          return textElement ? textElement.textContent : "";
+        })
+        .join(" ");
+    });
+
+    return transcript;
   } catch (error) {
     console.error("Error fetching YouTube transcript:", error);
     throw error;
+  } finally {
+    await browser.close();
   }
 }
 
@@ -44,15 +83,12 @@ async function getEmbedding(text: string): Promise<number[]> {
     inputs: text,
   });
 
+  // Ensure the response is a number array
   if (
     Array.isArray(response) &&
     response.every((item) => typeof item === "number")
   ) {
-    return response as number[];
-  } else if (Array.isArray(response) && Array.isArray(response[0])) {
-    return response[0] as number[];
-  } else if (typeof response === "number") {
-    return [response];
+    return response;
   } else {
     throw new Error("Unexpected embedding format");
   }
@@ -90,8 +126,7 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
     const userQuery = messages[messages.length - 1].content;
-    const youtubeUrl =
-      "https://www.youtube.com/watch?v=9boMnm5X9ak&list=PLC3y8-rFHvwheJHvseC3I0HuYI2f46oAK";
+    const youtubeUrl = "https://www.youtube.com/watch?v=Q5TM_aBk7IM";
 
     // Process YouTube URL if provided
     if (youtubeUrl) {

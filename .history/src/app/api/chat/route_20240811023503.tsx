@@ -44,15 +44,12 @@ async function getEmbedding(text: string): Promise<number[]> {
     inputs: text,
   });
 
+  // Ensure the response is a number array
   if (
     Array.isArray(response) &&
     response.every((item) => typeof item === "number")
   ) {
-    return response as number[];
-  } else if (Array.isArray(response) && Array.isArray(response[0])) {
-    return response[0] as number[];
-  } else if (typeof response === "number") {
-    return [response];
+    return response;
   } else {
     throw new Error("Unexpected embedding format");
   }
@@ -90,8 +87,7 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
     const userQuery = messages[messages.length - 1].content;
-    const youtubeUrl =
-      "https://www.youtube.com/watch?v=9boMnm5X9ak&list=PLC3y8-rFHvwheJHvseC3I0HuYI2f46oAK";
+    const youtubeUrl = "https://www.youtube.com/watch?v=Q5TM_aBk7IM";
 
     // Process YouTube URL if provided
     if (youtubeUrl) {

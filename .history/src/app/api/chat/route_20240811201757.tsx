@@ -7,6 +7,18 @@ import OpenAI from "openai";
 import { HfInference } from "@huggingface/inference";
 import puppeteer from "puppeteer";
 
+import { getTranscript as getTranscriptRaw } from "youtube-transcript-api";
+
+interface TranscriptResponse {
+  text: string;
+  duration: number;
+  offset: number;
+}
+
+const getTranscript = getTranscriptRaw as (
+  videoId: string
+) => Promise<TranscriptResponse[]>;
+
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY as string,
 });
@@ -18,9 +30,9 @@ const openai = new OpenAI({
 
 const index = pinecone.Index("chat");
 
-async function getYoutubeTranscript(videoId: string) {
+async function getYoutubeTranscript(videoId: string): Promise<string> {
   try {
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    const transcript = await getTranscript(videoId);
     return transcript.map((item) => item.text).join(" ");
   } catch (error) {
     console.error("Error fetching YouTube transcript:", error);
@@ -44,15 +56,12 @@ async function getEmbedding(text: string): Promise<number[]> {
     inputs: text,
   });
 
+  // Ensure the response is a number array
   if (
     Array.isArray(response) &&
     response.every((item) => typeof item === "number")
   ) {
-    return response as number[];
-  } else if (Array.isArray(response) && Array.isArray(response[0])) {
-    return response[0] as number[];
-  } else if (typeof response === "number") {
-    return [response];
+    return response;
   } else {
     throw new Error("Unexpected embedding format");
   }
@@ -90,8 +99,7 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json();
     const userQuery = messages[messages.length - 1].content;
-    const youtubeUrl =
-      "https://www.youtube.com/watch?v=9boMnm5X9ak&list=PLC3y8-rFHvwheJHvseC3I0HuYI2f46oAK";
+    const youtubeUrl = "https://www.youtube.com/watch?v=zaBy46MEUdY";
 
     // Process YouTube URL if provided
     if (youtubeUrl) {
