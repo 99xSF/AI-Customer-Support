@@ -5,7 +5,7 @@ import { YoutubeTranscript } from "youtube-transcript";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import OpenAI from "openai";
 import { HfInference } from "@huggingface/inference";
-import { YoutubeLoader } from "@langchain/community/document_loaders/web/youtube";
+import puppeteer from "puppeteer";
 
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY as string,
@@ -18,14 +18,10 @@ const openai = new OpenAI({
 
 const index = pinecone.Index("chat");
 
-async function getYoutubeTranscript(videoUrl: string) {
+async function getYoutubeTranscript(videoId: string) {
   try {
-    const loader = YoutubeLoader.createFromUrl(videoUrl, {
-      language: "en",
-      addVideoInfo: true,
-    });
-    const docs = await loader.load();
-    return docs[0].pageContent; // Assuming we want the transcript text
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    return transcript.map((item) => item.text).join(" ");
   } catch (error) {
     console.error("Error fetching YouTube transcript:", error);
     throw error;
@@ -102,7 +98,7 @@ export async function POST(req: NextRequest) {
       const videoId = new URL(youtubeUrl).searchParams.get("v");
       if (!videoId) throw new Error("Invalid YouTube URL");
 
-      const transcript = await getYoutubeTranscript(youtubeUrl);
+      const transcript = await getYoutubeTranscript(videoId);
       const splitTexts = await splitText(transcript);
       await embedAndStore(splitTexts, videoId);
     }

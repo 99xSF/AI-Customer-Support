@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       const videoId = new URL(youtubeUrl).searchParams.get("v");
       if (!videoId) throw new Error("Invalid YouTube URL");
 
-      const transcript = await getYoutubeTranscript(youtubeUrl);
+      const transcript = await getYoutubeTranscript(videoId);
       const splitTexts = await splitText(transcript);
       await embedAndStore(splitTexts, videoId);
     }
